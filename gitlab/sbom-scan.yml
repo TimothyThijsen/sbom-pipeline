@@ -1,0 +1,75 @@
+# GitLab CI template: image build, SBOM generation and vulnerability scan.
+# Include it from a project, pinned to a commit SHA (see README). The YAML is all GitLab fetches,
+# so the jobs download the scripts of the same commit themselves (SBOM_PIPELINE_REF).
+
+stages:
+  - build
+  - package
+  - sbom_generation
+  - vulnerability_scan
+
+variables:
+  SBOM_PIPELINE_REPO: TimothyThijsen/sbom-pipeline
+  SBOM_PIPELINE_REF: ""            # REQUIRED: the same commit SHA as in the include URL
+  IMAGE_NAME: $CI_PROJECT_NAME
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  CONTEXT: "."
+  DOCKERFILE: ""                   # empty = $CONTEXT/Dockerfile
+  FAIL_ON: ""                      # empty = report only; low | medium | high | critical = block
+  OUT_DIR: sbom-out
+
+.fetch_pipeline_scripts:
+  before_script:
+    - '[ -n "$SBOM_PIPELINE_REF" ] || { echo "SBOM_PIPELINE_REF is not set"; exit 1; }'
+    - mkdir -p .sbom-pipeline
+    - wget -q -O .sbom-pipeline/src.tar.gz "https://codeload.github.com/$SBOM_PIPELINE_REPO/tar.gz/$SBOM_PIPELINE_REF"
+    - tar -xzf .sbom-pipeline/src.tar.gz -C .sbom-pipeline --strip-components=1
+
+package:
+  extends: .fetch_pipeline_scripts
+  stage: package
+  image: docker:29.9.2@sha256:9e79b879b177fbd72c34376a3dd3d91747da5db49e1f560f76aea59561471977
+  tags:
+    - docker                       # a runner that mounts the Docker socket; override in the project if needed
+  script:
+    - sh .sbom-pipeline/scripts/build-image.sh
+  artifacts:
+    paths:
+      - $OUT_DIR/image.tar
+    expire_in: 1 day
+
+sbom_generation:
+  extends: .fetch_pipeline_scripts
+  stage: sbom_generation
+  image: alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
+  tags:
+    - docker
+  script:
+    - sh .sbom-pipeline/scripts/install-tools.sh
+    - sh .sbom-pipeline/scripts/generate-sbom.sh
+  artifacts:
+    paths:
+      - $OUT_DIR/sbom.cdx.json
+    reports:
+      cyclonedx:
+        - $OUT_DIR/sbom.cdx.json
+    expire_in: 6 mos
+  dependencies:
+    - package
+
+vulnerability_scan:
+  extends: .fetch_pipeline_scripts
+  stage: vulnerability_scan
+  image: alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
+  tags:
+    - docker
+  script:
+    - sh .sbom-pipeline/scripts/install-tools.sh
+    - sh .sbom-pipeline/scripts/scan-sbom.sh
+  artifacts:
+    when: always                   # keep the report even when FAIL_ON blocks the job
+    paths:
+      - $OUT_DIR/grype.json
+    expire_in: 6 mos
+  dependencies:
+    - sbom_generation

@@ -1,0 +1,78 @@
+name: SBOM and vulnerability scan
+description: >
+  Builds a Docker image, generates a CycloneDX SBOM with Syft and scans it with Grype.
+  Reports by default; set fail-on to block the job on a severity.
+
+inputs:
+  image-name:
+    description: Name of the image and of the build inside the SBOM (for example the project name).
+    required: true
+  image-tag:
+    description: Tag of the image. Empty means the short commit SHA.
+    default: ""
+  context:
+    description: Docker build context folder, relative to the repository root.
+    default: "."
+  dockerfile:
+    description: Path to the Dockerfile. Empty means <context>/Dockerfile.
+    default: ""
+  fail-on:
+    description: Fail the job when a finding has at least this severity (low, medium, high, critical). Empty means report only.
+    default: ""
+  artifact-name:
+    description: Name of the uploaded artifact. Must be unique per job when you use a matrix. Empty means sbom-<image-name>.
+    default: ""
+  retention-days:
+    description: How long GitHub keeps the artifact (the maximum depends on the repository settings).
+    default: "90"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Syft and Grype (checksum verified)
+      shell: sh
+      env:
+        TOOLS_DIR: ${{ runner.temp }}/sbom-tools
+      run: sh "${{ github.action_path }}/scripts/install-tools.sh"
+
+    - name: Build image
+      shell: sh
+      env:
+        IMAGE_NAME: ${{ inputs.image-name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
+        CONTEXT: ${{ inputs.context }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        OUT_DIR: ${{ runner.temp }}/sbom-out
+      run: |
+        IMAGE_TAG=${INPUT_IMAGE_TAG:-$(echo "$GITHUB_SHA" | cut -c1-7)}
+        echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+        export IMAGE_TAG
+        sh "${{ github.action_path }}/scripts/build-image.sh"
+
+    - name: Generate SBOM
+      shell: sh
+      env:
+        IMAGE_NAME: ${{ inputs.image-name }}
+        OUT_DIR: ${{ runner.temp }}/sbom-out
+        TOOLS_DIR: ${{ runner.temp }}/sbom-tools
+      run: sh "${{ github.action_path }}/scripts/generate-sbom.sh"
+
+    - name: Scan SBOM
+      shell: sh
+      env:
+        OUT_DIR: ${{ runner.temp }}/sbom-out
+        TOOLS_DIR: ${{ runner.temp }}/sbom-tools
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: sh "${{ github.action_path }}/scripts/scan-sbom.sh"
+
+    # always(): the reports are kept even when the scan blocks the job.
+    - name: Upload SBOM and scan report
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('sbom-{0}', inputs.image-name) }}
+        path: |
+          ${{ runner.temp }}/sbom-out/sbom.cdx.json
+          ${{ runner.temp }}/sbom-out/grype.json
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: warn
