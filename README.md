@@ -7,8 +7,9 @@ platform gets identical behaviour.
 By default it only **reports**. Setting one input (`fail-on` / `FAIL_ON`) makes it **block** the pipeline.
 
 > **Status:** work in progress, part of a research project on SBOM tooling in CI/CD.
-> The scripts are tested in a Linux container. The GitHub action and the GitLab template are written but have not run on
-> the real platforms yet; this section is updated when they have.
+> The scripts, the GitHub action and the GitLab template have all run successfully: the action on GitHub-hosted runners
+> (two services in a matrix) and the template on a GitLab Docker runner. Blocking (`fail-on`) is a plain severity
+> threshold, tested in a Linux container only, not yet on a real pipeline.
 
 ## What it does
 
