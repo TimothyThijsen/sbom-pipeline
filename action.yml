@@ -19,6 +19,15 @@ inputs:
   fail-on:
     description: Fail the job when a finding has at least this severity (low, medium, high, critical). Empty means report only.
     default: ""
+  block-exploited:
+    description: Fail the job when a finding has a fix and is known exploited or has EPSS of epss-block or more. Set to "false" to only report.
+    default: "true"
+  epss-block:
+    description: EPSS value (0 to 1) at or above which a fixable finding blocks.
+    default: "0.1"
+  epss-warn:
+    description: EPSS value at or above which a fixable finding is listed as a warning.
+    default: "0.01"
   artifact-name:
     description: Name of the uploaded artifact. Must be unique per job when you use a matrix. Empty means sbom-<image-name>.
     default: ""
@@ -63,6 +72,9 @@ runs:
         OUT_DIR: ${{ runner.temp }}/sbom-out
         TOOLS_DIR: ${{ runner.temp }}/sbom-tools
         FAIL_ON: ${{ inputs.fail-on }}
+        BLOCK_EXPLOITED: ${{ inputs.block-exploited }}
+        EPSS_BLOCK: ${{ inputs.epss-block }}
+        EPSS_WARN: ${{ inputs.epss-warn }}
       run: sh "${{ github.action_path }}/scripts/scan-sbom.sh"
 
     # always(): the reports are kept even when the scan blocks the job.

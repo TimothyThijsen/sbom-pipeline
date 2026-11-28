@@ -41,3 +41,17 @@ install_tool() { # install_tool NAME VERSION EXPECTED_SHA256
 
 install_tool syft  "$SYFT_VERSION"  "$SYFT_SHA256_LINUX_AMD64"
 install_tool grype "$GRYPE_VERSION" "$GRYPE_SHA256_LINUX_AMD64"
+
+# jq is a single binary, not an archive.
+if [ "$("$TOOLS_DIR/jq" --version 2>/dev/null)" = "jq-$JQ_VERSION" ]; then
+  log "jq $JQ_VERSION already installed"
+else
+  log "downloading jq $JQ_VERSION"
+  fetch "https://github.com/jqlang/jq/releases/download/jq-$JQ_VERSION/jq-linux-amd64" "$TOOLS_DIR/jq"
+  log "verifying sha256"
+  if ! echo "$JQ_SHA256_LINUX_AMD64  $TOOLS_DIR/jq" | sha256sum -c -; then
+    rm -f "$TOOLS_DIR/jq"
+    die "checksum mismatch for jq, refusing to use it"
+  fi
+  chmod +x "$TOOLS_DIR/jq"
+fi

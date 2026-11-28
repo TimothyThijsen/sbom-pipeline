@@ -22,4 +22,9 @@ status=0
 
 # The database is only downloaded during the scan, so this must come after it.
 "$TOOLS_DIR/grype" db status || true
-exit "$status"
+
+# The blocking gate (fixable and exploited findings) runs last, so its message is the last thing in the log.
+gate=0
+sh "$(dirname "$0")/gate.sh" || gate=$?
+[ "$status" -eq 0 ] || exit "$status"
+exit "$gate"

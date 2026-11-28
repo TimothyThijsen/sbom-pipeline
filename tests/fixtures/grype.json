@@ -1,0 +1,7 @@
+{"matches":[
+ {"vulnerability":{"id":"CVE-1","severity":"Low","fix":{"state":"fixed","versions":["2.0"]},"knownExploited":[{"cve":"CVE-1"}],"epss":[{"epss":0.0001}]},"artifact":{"name":"kev-fixed","version":"1.0"}},
+ {"vulnerability":{"id":"CVE-2","severity":"High","fix":{"state":"fixed","versions":["2.0"]},"knownExploited":null,"epss":[{"epss":0.05}]},"artifact":{"name":"likely-fixed","version":"1.0"}},
+ {"vulnerability":{"id":"CVE-3","severity":"Critical","fix":{"state":"not-fixed","versions":[]},"knownExploited":[{"cve":"CVE-3"}],"epss":[{"epss":0.9}]},"artifact":{"name":"kev-no-fix","version":"1.0"}},
+ {"vulnerability":{"id":"CVE-4","severity":"Critical","fix":{"state":"fixed","versions":["2.0"]},"knownExploited":null,"epss":[{"epss":0.001}]},"artifact":{"name":"quiet-fixed","version":"1.0"}},
+ {"vulnerability":{"id":"CVE-5","severity":"Medium","fix":{"state":"fixed"},"epss":null},"artifact":{"name":"no-epss","version":"1.0"}}
+]}

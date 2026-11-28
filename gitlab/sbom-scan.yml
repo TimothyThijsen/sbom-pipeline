@@ -15,7 +15,10 @@ variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   CONTEXT: "."
   DOCKERFILE: ""                   # empty = $CONTEXT/Dockerfile
-  FAIL_ON: ""                      # empty = report only; low | medium | high | critical = block
+  FAIL_ON: ""                      # optional extra gate on severity: low | medium | high | critical
+  BLOCK_EXPLOITED: "true"          # block when a finding has a fix and is exploited; "false" = only report
+  EPSS_BLOCK: "0.1"                # EPSS at or above this blocks (when a fix exists)
+  EPSS_WARN: "0.01"                # EPSS at or above this is listed as a warning
   OUT_DIR: sbom-out
 
 .fetch_pipeline_scripts:

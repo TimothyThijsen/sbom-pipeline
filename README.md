@@ -4,12 +4,13 @@ One pipeline that builds your Docker image, creates an SBOM of everything inside
 vulnerabilities. The same shell scripts run on **GitHub Actions** and on **GitLab CI**, so a project on either
 platform gets identical behaviour.
 
-By default it only **reports**. Setting one input (`fail-on` / `FAIL_ON`) makes it **block** the pipeline.
+By default it **blocks** on one narrow case: a finding that has a fix available and is known to be exploited (or very likely
+to be). Everything else is listed or kept in the report. See [Blocking rule](#blocking-rule).
 
 > **Status:** work in progress, part of a research project on SBOM tooling in CI/CD.
 > The scripts, the GitHub action and the GitLab template have all run successfully: the action on GitHub-hosted runners
 > (two services in a matrix) and the template on a GitLab Docker runner. Blocking (`fail-on`) is a plain severity
-> threshold, tested in a Linux container only, not yet on a real pipeline.
+> rule and the blocking gate are tested in a Linux container and on saved scan results, not yet on a real pipeline.
 
 ## What it does
 
@@ -124,7 +125,10 @@ Things to know:
 | `image-tag` | `IMAGE_TAG` | short commit SHA | Tag of the image |
 | `context` | `CONTEXT` | `.` | Docker build context |
 | `dockerfile` | `DOCKERFILE` | `<context>/Dockerfile` | Path to the Dockerfile |
-| `fail-on` | `FAIL_ON` | empty (report only) | `low`, `medium`, `high` or `critical`: fail on this severity or higher |
+| `block-exploited` | `BLOCK_EXPLOITED` | `true` | Fail when a finding has a fix and is exploited (see below); `false` = only report |
+| `epss-block` | `EPSS_BLOCK` | `0.1` | EPSS at or above this blocks (only with a fix) |
+| `epss-warn` | `EPSS_WARN` | `0.01` | EPSS at or above this is listed as a warning |
+| `fail-on` | `FAIL_ON` | empty | Optional extra gate on severity: `low`, `medium`, `high` or `critical` |
 | `artifact-name` | | `sbom-<image-name>` | Artifact name (GitHub), must be unique per matrix job |
 | `retention-days` | | `90` | Artifact retention (GitHub); GitLab keeps the SBOM and report 6 months |
 | | `SBOM_PIPELINE_REF` | (required) | Commit SHA of this repo that the GitLab jobs download |
@@ -138,6 +142,20 @@ IMAGE_NAME=my-service IMAGE_TAG=local sh scripts/install-tools.sh
 IMAGE_NAME=my-service IMAGE_TAG=local sh scripts/generate-sbom.sh
 sh scripts/scan-sbom.sh
 ```
+
+## Blocking rule
+
+Only findings **with a fix available** are considered, because a developer cannot act on the rest:
+
+| Level | Condition | Effect |
+|---|---|---|
+| BLOCK | known exploited (CISA KEV) **or** EPSS >= `EPSS_BLOCK` (0.1) | the job fails |
+| WARN | EPSS >= `EPSS_WARN` (0.01) | listed in the log, the job passes |
+
+EPSS is the estimated probability that a vulnerability is exploited in the next 30 days. The values change daily with the
+Grype database, so the same image can start to block later. The fix is to update the package or the base image.
+`grype db status` is printed on every run to record which database was used. `tests/gate-test.sh` checks the rule on a
+small fixture.
 
 ## Pinning
 
@@ -157,7 +175,8 @@ If a checksum is wrong, `install-tools.sh` deletes the download and stops with a
 
 - Linux amd64 only (no checksums for other platforms in `tools.env` yet).
 - The image SBOM has no Go function symbols (CycloneDX drops them), so Grype can report some Go findings that do not apply.
-- A severity threshold alone is a crude rule: severity is not the same as risk (exploitability and known exploits matter).
+- The EPSS thresholds are starting points, not truth. Findings are counted per package, not per CVE.
+- Ignore rules (accepting a finding with a reason) are not part of the gate yet; Grype's own `.grype.yaml` ignore list still applies.
 - Results depend on the Grype database of the day; `grype db status` is printed on every run for that reason.
 
 ## License

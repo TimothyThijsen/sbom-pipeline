@@ -3,3 +3,4 @@ image.tar
 sbom.cdx.json
 grype.json
 out/
+!tests/fixtures/grype.json
